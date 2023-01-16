@@ -1,4 +1,5 @@
 import csv
+import math
 import os.path as path
 import pickle
 from datetime import datetime, timedelta
@@ -96,15 +97,15 @@ def find_jump_in_topcon(ts: np.ndarray, pos: np.ndarray, height: np.ndarray, min
     for i in range(3):
         axes[i].set_xlim(left=begin, right=end)
         axes[i].set_xlabel("time")
-    axes[0].set_ylabel("position x")
     axes[0].plot(ts, pos[:, 0])
     axes[0].vlines(ts[jump_idxes], pos[:, 0].min(), pos[:, 0].max(), colors="tab:orange")
-    axes[1].set_ylabel("position y")
+    axes[0].set_ylabel("position x")
     axes[1].plot(ts, pos[:, 1])
     axes[1].vlines(ts[jump_idxes], pos[:, 1].min(), pos[:, 1].max(), colors="tab:orange")
-    axes[2].set_ylabel("height")
+    axes[1].set_ylabel("position y")
     axes[2].plot(ts, height)
     axes[2].scatter(ts[jump_idxes], height[jump_idxes], c="tab:orange")
+    axes[2].set_ylabel("height")
     fig.show()
 
     return jump_idxes
@@ -157,19 +158,27 @@ def make_ts_unique(ts: np.ndarray, pos: np.ndarray, height: np.ndarray) -> tuple
 
 def plot(ts: np.ndarray, acc: np.ndarray, pos: np.ndarray) -> None:
     fig, axes = plt.subplots(nrows=3, figsize=(16, 12))
+    axes[0].plot(ts, np.linalg.norm(acc, axis=1))
+    axes[0].set_ylabel("acceleration norm")
+    axes[1].plot(ts, pos[:, 0])
+    axes[1].set_ylabel("position x")
+    axes[2].plot(ts, pos[:, 1])
+    axes[2].set_ylabel("position y")
     for i in range(3):
         axes[i].set_xlabel("time")
-    axes[0].set_ylabel("acceleration norm")
-    axes[0].plot(ts, np.linalg.norm(acc, axis=1))
-    axes[1].set_ylabel("position x")
-    axes[1].plot(ts, pos[:, 0])
-    axes[2].set_ylabel("position y")
-    axes[2].plot(ts, pos[:, 1])
     fig.show()
 
-def vis_traj(pos: np.ndarray) -> None:
+def rot(angle: float, pos: np.ndarray) -> np.ndarray:
+    angle = math.radians(angle)
+    return np.dot(((math.cos(angle), -math.sin(angle)), (math.sin(angle), math.cos(angle))), pos.T).T
+
+def vis_traj(pos: np.ndarray, ref_direct_tan: Optional[float] = None) -> None:
     plt.axis("equal")
-    plt.scatter(pos[:, 0], pos[:, 1], s=1, marker=".")
+    if ref_direct_tan is not None:
+        ref_direct_y_range = np.array((pos[:, 1].min() - 1, pos[:, 1].max() + 1), dtype=np.float64)
+        plt.plot(ref_direct_y_range / ref_direct_tan, ref_direct_y_range, c="tab:orange")
+    plt.scatter(pos[1:, 0], pos[1:, 1], s=1, marker=".")
+    plt.scatter(pos[0, 0], pos[0, 1])
     plt.xlabel("position x")
     plt.ylabel("position y")
     plt.show()
