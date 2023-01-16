@@ -1,1 +1,1 @@
-# topcon_log_formatter.py
+# topcon_log_synchronizer.py
