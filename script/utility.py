@@ -201,19 +201,19 @@ def rot(angle: float, pos: np.ndarray) -> np.ndarray:
     angle = math.radians(angle)
     return np.dot(((math.cos(angle), -math.sin(angle)), (math.sin(angle), math.cos(angle))), pos.T).T
 
-def split(ts: np.ndarray, inertial_val: np.ndarray, pos: np.ndarray, height: np.ndarray, factor: Literal["x_max", "x_min", "y_max", "y_min"], min_interval: int = 0) -> tuple[tuple[np.ndarray, ...], ...]:
+def split(ts: np.ndarray, inertial_val: np.ndarray, pos: np.ndarray, height: np.ndarray, factor: Literal["x_max", "x_min", "y_max", "y_min"], min_interval: int = 0, split_num: int = 5) -> tuple[tuple[np.ndarray, ...], ...]:
     match factor:
         case "x_max":
-            split_idxes = _find_separated_max_n_idxes(pos[:, 0], min_interval, 6)
+            split_idxes = _find_separated_max_n_idxes(pos[:, 0], min_interval, split_num + 1)
         case "x_min":
-            split_idxes = _find_separated_max_n_idxes(-pos[:, 0], min_interval, 6)
+            split_idxes = _find_separated_max_n_idxes(-pos[:, 0], min_interval, split_num + 1)
         case "y_max":
-            split_idxes = _find_separated_max_n_idxes(pos[:, 1], min_interval, 6)
+            split_idxes = _find_separated_max_n_idxes(pos[:, 1], min_interval, split_num + 1)
         case "y_min":
-            split_idxes = _find_separated_max_n_idxes(-pos[:, 1], min_interval, 6)
+            split_idxes = _find_separated_max_n_idxes(-pos[:, 1], min_interval, split_num + 1)
 
     data = []
-    for i in range(5):
+    for i in range(split_num):
         data.append((ts[split_idxes[i]:split_idxes[i + 1]], inertial_val[split_idxes[i]:split_idxes[i + 1]], pos[split_idxes[i]:split_idxes[i + 1]], height[split_idxes[i]:split_idxes[i + 1]]))
 
     return tuple(data)
