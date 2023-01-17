@@ -175,7 +175,7 @@ def rot(angle: float, pos: np.ndarray) -> np.ndarray:
 def vis_traj(pos: np.ndarray, ref_direct_tan: Optional[float] = None) -> None:
     plt.axis("equal")
     if ref_direct_tan is not None:
-        ref_direct_y_range = np.array((pos[:, 1].min() - 1, pos[:, 1].max() + 1), dtype=np.float64)
+        ref_direct_y_range = np.array((pos[:, 1].min() - 1, pos[:, 1].max() + 1), dtype=np.float32)
         plt.plot(ref_direct_y_range / ref_direct_tan, ref_direct_y_range, c="tab:orange")
     plt.scatter(pos[1:, 0], pos[1:, 1], s=1, marker=".")
     plt.scatter(pos[0, 0], pos[0, 1])
