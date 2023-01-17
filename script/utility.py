@@ -169,12 +169,12 @@ def make_ts_unique(ts: np.ndarray, pos: np.ndarray, height: np.ndarray) -> tuple
     return np.array(unique_ts, dtype=datetime), np.array(unique_pos, dtype=np.float32), np.array(unique_height, dtype=np.float32)
 
 def _quat2direct(quat: np.ndarray) -> np.ndarray:
-    return Rot.from_quat(quat).as_euler("ZXZ", degrees=True)[:, 0]
+    return Rot.from_quat(quat).as_euler("ZXZ", degrees=True)[:, 0] + 90
 
 def plot(ts: np.ndarray, quat: np.ndarray, pos: np.ndarray) -> None:
     fig, axes = plt.subplots(nrows=3, sharex=True, figsize=(16, 12))
     axes[0].plot(ts, _quat2direct(quat))
-    axes[0].set_ylabel("inertial sensor direction [°]")
+    axes[0].set_ylabel("smartphone back direction [°]")
     axes[1].plot(ts, pos[:, 0])
     axes[1].set_ylabel("position x [m]")
     axes[2].plot(ts, pos[:, 1])
