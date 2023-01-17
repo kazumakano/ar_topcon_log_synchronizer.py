@@ -3,6 +3,7 @@ import math
 import os.path as path
 import pickle
 from datetime import datetime, timedelta
+from os import mkdir
 from typing import Literal, Optional
 import numpy as np
 import yaml
@@ -48,34 +49,47 @@ def adjust_ts_offset(inertial_jump_idxes: np.ndarray, inertial_ts: np.ndarray, t
 def cut_with_padding(ar: np.ndarray, cut_idxes: np.ndarray, padding: int) -> np.ndarray:
     return ar[cut_idxes[0] + padding:cut_idxes[1] - padding + 1]
 
-def export_log(ts: np.ndarray, inertial_val: np.ndarray, pos: np.ndarray, height: np.ndarray, file_name: str) -> None:
-    with open(path.join(path.dirname(__file__), "../synced/", file_name + ".csv"), mode="w", newline="") as f:
-        writer = csv.writer(f)
-        t: datetime
-        for i, t in enumerate(ts):
-            writer.writerow((t.strftime("%Y-%m-%d %H:%M:%S.%f"), *inertial_val[i], *pos[i], height[i]))
-    print(f"written to {file_name}.csv")
+def export(data: tuple[tuple[np.ndarray, ...], ...], dir_name: str) -> None:
+    dir = path.join(path.dirname(__file__), "../synced/", dir_name)
+    if not path.exists(dir):
+        mkdir(dir)
 
-    with open(path.join(path.dirname(__file__), "../synced/", file_name + ".pkl"), mode="wb") as f:
-        pickle.dump((ts, inertial_val, pos, height), f)
-    print(f"written to {file_name}.pkl")
+    for i, d in enumerate(data):
+        with open(path.join(dir, str(i + 1) + ".csv"), mode="w", newline="") as f:
+            writer = csv.writer(f)
+            t: datetime
+            for j, t in enumerate(d[0]):
+                writer.writerow((t.strftime("%Y-%m-%d %H:%M:%S.%f"), *d[1][j], *d[2][j], d[3][j]))
+    print("written to 1.csv ~ 5.csv")
 
-def _find_separated_max_2_idxes(ar: np.ndarray, min_interval: int) -> np.ndarray:
-    max_idxes = np.empty(2, dtype=int)
-    for i, j in enumerate(reversed(np.argsort(ar))):
-        if i == 0:
-            max_idxes[0] = j
-        elif abs(j - max_idxes[0]) > min_interval:
-            max_idxes[1] = j
-            break
+    for i, d in enumerate(data):
+        with open(path.join(dir, str(i + 1) + ".pkl"), mode="wb") as f:
+            pickle.dump(d, f)
+    print("written to 1.pkl ~ 5.pkl")
+
+def _is_separated(min_interval: int, src_idxes: np.ndarray, tgt_idx: int) -> bool:
+    for i in src_idxes:
+        if abs(i - tgt_idx) < min_interval:
+            return False
+    return True
+
+def _find_separated_max_n_idxes(ar: np.ndarray, min_interval: int, n: int) -> np.ndarray:
+    cnt = 0
+    max_idxes = np.empty(n, dtype=int)
+    for i in reversed(np.argsort(ar)):
+        if cnt == 0 or _is_separated(min_interval, max_idxes[:cnt], i):
+            max_idxes[cnt] = i
+            cnt += 1
+            if cnt == n:
+                break
 
     max_idxes.sort()
 
     return max_idxes
 
-def find_jump_in_inertial(ts: np.ndarray, acc: np.ndarray, min_interval: int) -> np.ndarray:
+def find_jump_in_inertial(ts: np.ndarray, acc: np.ndarray, min_interval: int = 0) -> np.ndarray:
     acc_norm = np.linalg.norm(acc, axis=1)
-    jump_idxes = _find_separated_max_2_idxes(acc_norm, min_interval)
+    jump_idxes = _find_separated_max_n_idxes(acc_norm, min_interval, 2)
 
     plt.figure(figsize=(16, 4))
     plt.plot(ts, acc_norm)
@@ -86,7 +100,7 @@ def find_jump_in_inertial(ts: np.ndarray, acc: np.ndarray, min_interval: int) ->
 
     return jump_idxes
 
-def find_jump_in_topcon(ts: np.ndarray, pos: np.ndarray, height: np.ndarray, min_interval: int, begin: Optional[datetime] = None, end: Optional[datetime] = None) -> np.ndarray:
+def find_jump_in_topcon(ts: np.ndarray, pos: np.ndarray, height: np.ndarray, min_interval: int = 0, begin: Optional[datetime] = None, end: Optional[datetime] = None) -> np.ndarray:
     if begin is None:
         begin = ts[0]
         begin_idx = 0
@@ -103,7 +117,7 @@ def find_jump_in_topcon(ts: np.ndarray, pos: np.ndarray, height: np.ndarray, min
             if t > end:
                 end_idx = begin_idx + 1 + i
                 break
-    jump_idxes = begin_idx + _find_separated_max_2_idxes(height[begin_idx:end_idx], min_interval)
+    jump_idxes = begin_idx + _find_separated_max_n_idxes(height[begin_idx:end_idx], min_interval, 2)
 
     fig, axes = plt.subplots(nrows=3, sharex=True, figsize=(16, 12))
     for i in range(3):
@@ -171,13 +185,14 @@ def make_ts_unique(ts: np.ndarray, pos: np.ndarray, height: np.ndarray) -> tuple
 def _quat2direct(quat: np.ndarray) -> np.ndarray:
     return Rot.from_quat(quat).as_euler("ZXZ", degrees=True)[:, 0] + 90
 
-def plot(ts: np.ndarray, quat: np.ndarray, pos: np.ndarray) -> None:
+def plot(data: tuple[tuple[np.ndarray, ...], ...]) -> None:
     fig, axes = plt.subplots(nrows=3, sharex=True, figsize=(16, 12))
-    axes[0].plot(ts, _quat2direct(quat))
+    for d in data:
+        axes[0].plot(d[0], _quat2direct(d[1][:, 12:16]))
+        axes[1].plot(d[0], d[2][:, 0])
+        axes[2].plot(d[0], d[2][:, 1])
     axes[0].set_ylabel("smartphone back direction [°]")
-    axes[1].plot(ts, pos[:, 0])
     axes[1].set_ylabel("position x [m]")
-    axes[2].plot(ts, pos[:, 1])
     axes[2].set_xlabel("time")
     axes[2].set_ylabel("position y [m]")
     fig.show()
@@ -185,6 +200,23 @@ def plot(ts: np.ndarray, quat: np.ndarray, pos: np.ndarray) -> None:
 def rot(angle: float, pos: np.ndarray) -> np.ndarray:
     angle = math.radians(angle)
     return np.dot(((math.cos(angle), -math.sin(angle)), (math.sin(angle), math.cos(angle))), pos.T).T
+
+def split(ts: np.ndarray, inertial_val: np.ndarray, pos: np.ndarray, height: np.ndarray, factor: Literal["x_max", "x_min", "y_max", "y_min"], min_interval: int = 0) -> tuple[tuple[np.ndarray, ...], ...]:
+    match factor:
+        case "x_max":
+            split_idxes = _find_separated_max_n_idxes(pos[:, 0], min_interval, 6)
+        case "x_min":
+            split_idxes = _find_separated_max_n_idxes(-pos[:, 0], min_interval, 6)
+        case "y_max":
+            split_idxes = _find_separated_max_n_idxes(pos[:, 1], min_interval, 6)
+        case "y_min":
+            split_idxes = _find_separated_max_n_idxes(-pos[:, 1], min_interval, 6)
+
+    data = []
+    for i in range(5):
+        data.append((ts[split_idxes[i]:split_idxes[i + 1]], inertial_val[split_idxes[i]:split_idxes[i + 1]], pos[split_idxes[i]:split_idxes[i + 1]], height[split_idxes[i]:split_idxes[i + 1]]))
+
+    return tuple(data)
 
 def vis_tj(pos: np.ndarray, ref_direct_tan: Optional[float] = None) -> None:
     plt.axis("equal")
@@ -197,11 +229,11 @@ def vis_tj(pos: np.ndarray, ref_direct_tan: Optional[float] = None) -> None:
     plt.ylabel("position y [m]")
     plt.show()
 
-def write_conf(file_name: str, padding: int, rot_angle: int) -> None:
-    with open(path.join(path.dirname(__file__), "../synced/", file_name + ".yaml"), mode="w") as f:
+def write_conf(dir_name: str, padding: int, rot_angle: int) -> None:
+    with open(path.join(path.dirname(__file__), "../synced/", dir_name, "config.yaml"), mode="w") as f:
         yaml.safe_dump({
             "padding": padding,
             "rot_angle": rot_angle
         }, f)
-    
-    print(f"written to {file_name}.yaml")
+
+    print("written to config.yaml")
