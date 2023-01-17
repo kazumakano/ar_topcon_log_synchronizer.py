@@ -5,6 +5,7 @@ import pickle
 from datetime import datetime, timedelta
 from typing import Optional
 import numpy as np
+import yaml
 from matplotlib import pyplot as plt
 from scipy.interpolate import interp1d
 
@@ -36,17 +37,17 @@ def adjust_ts_offset(inertial_jump_idxes: np.ndarray, inertial_ts: np.ndarray, t
 def cut_with_padding(ar: np.ndarray, cut_idxes: np.ndarray, padding: int) -> np.ndarray:
     return ar[cut_idxes[0] + padding:cut_idxes[1] - padding + 1]
 
-def export(ts: np.ndarray, inertial_val: np.ndarray, pos: np.ndarray, height: np.ndarray, file_name: str) -> None:
+def export_log(ts: np.ndarray, inertial_val: np.ndarray, pos: np.ndarray, height: np.ndarray, file_name: str) -> None:
     with open(path.join(path.dirname(__file__), "../synced/", file_name + ".csv"), mode="w", newline="") as f:
         writer = csv.writer(f)
         t: datetime
         for i, t in enumerate(ts):
             writer.writerow((t.strftime("%Y-%m-%d %H:%M:%S.%f"), *inertial_val[i], *pos[i], height[i]))
-    print(f"{file_name}.csv has been written")
+    print(f"written to {file_name}.csv")
 
     with open(path.join(path.dirname(__file__), "../synced/", file_name + ".pkl"), mode="wb") as f:
         pickle.dump((ts, inertial_val, pos, height), f)
-    print(f"{file_name}.pkl has been written")
+    print(f"written to {file_name}.pkl")
 
 def _find_separated_max_2_idxes(ar: np.ndarray, min_interval: int) -> np.ndarray:
     max_idxes = np.empty(2, dtype=int)
@@ -93,10 +94,9 @@ def find_jump_in_topcon(ts: np.ndarray, pos: np.ndarray, height: np.ndarray, min
                 break
     jump_idxes = begin_idx + _find_separated_max_2_idxes(height[begin_idx:end_idx], min_interval)
 
-    fig, axes = plt.subplots(nrows=3, figsize=(16, 12))
+    fig, axes = plt.subplots(nrows=3, sharex=True, figsize=(16, 12))
     for i in range(3):
         axes[i].set_xlim(left=begin, right=end)
-        axes[i].set_xlabel("time")
     axes[0].plot(ts, pos[:, 0])
     axes[0].vlines(ts[jump_idxes], pos[:, 0].min(), pos[:, 0].max(), colors="tab:orange")
     axes[0].set_ylabel("position x")
@@ -105,6 +105,7 @@ def find_jump_in_topcon(ts: np.ndarray, pos: np.ndarray, height: np.ndarray, min
     axes[1].set_ylabel("position y")
     axes[2].plot(ts, height)
     axes[2].scatter(ts[jump_idxes], height[jump_idxes], c="tab:orange")
+    axes[2].set_xlabel("time")
     axes[2].set_ylabel("height")
     fig.show()
 
@@ -157,15 +158,14 @@ def make_ts_unique(ts: np.ndarray, pos: np.ndarray, height: np.ndarray) -> tuple
     return np.array(unique_ts, dtype=datetime), np.array(unique_pos, dtype=np.float32), np.array(unique_height, dtype=np.float32)
 
 def plot(ts: np.ndarray, acc: np.ndarray, pos: np.ndarray) -> None:
-    fig, axes = plt.subplots(nrows=3, figsize=(16, 12))
+    fig, axes = plt.subplots(nrows=3, sharex=True, figsize=(16, 12))
     axes[0].plot(ts, np.linalg.norm(acc, axis=1))
     axes[0].set_ylabel("acceleration norm")
     axes[1].plot(ts, pos[:, 0])
     axes[1].set_ylabel("position x")
     axes[2].plot(ts, pos[:, 1])
+    axes[2].set_xlabel("time")
     axes[2].set_ylabel("position y")
-    for i in range(3):
-        axes[i].set_xlabel("time")
     fig.show()
 
 def rot(angle: float, pos: np.ndarray) -> np.ndarray:
@@ -182,3 +182,12 @@ def vis_traj(pos: np.ndarray, ref_direct_tan: Optional[float] = None) -> None:
     plt.xlabel("position x")
     plt.ylabel("position y")
     plt.show()
+
+def write_conf(file_name: str, padding: int, rot_angle: int) -> None:
+    with open(path.join(path.dirname(__file__), "../synced/", file_name + ".yaml"), mode="w") as f:
+        yaml.safe_dump({
+            "padding": padding,
+            "rot_angle": rot_angle
+        }, f)
+    
+    print(f"written to {file_name}.yaml")
