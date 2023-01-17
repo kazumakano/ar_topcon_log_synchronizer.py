@@ -3,7 +3,7 @@ import math
 import os.path as path
 import pickle
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Literal, Optional
 import numpy as np
 import yaml
 from matplotlib import pyplot as plt
@@ -31,8 +31,14 @@ def adjust_freq(inertial_ts: np.ndarray, topcon_ts: np.ndarray, topcon_pos: np.n
 
     return np.hstack((resampled_pos_x[:, np.newaxis], resampled_pos_y[:, np.newaxis])), resampled_height
 
-def adjust_ts_offset(inertial_jump_idxes: np.ndarray, inertial_ts: np.ndarray, topcon_jump_idxes: np.ndarray, topcon_ts: np.ndarray) -> np.ndarray:
-    return topcon_ts + (inertial_ts[inertial_jump_idxes] - topcon_ts[topcon_jump_idxes]).mean()
+def adjust_ts_offset(inertial_jump_idxes: np.ndarray, inertial_ts: np.ndarray, topcon_jump_idxes: np.ndarray, topcon_ts: np.ndarray, use_jump_idxes: Literal["both", "former", "latter"] = "both") -> np.ndarray:
+    match use_jump_idxes:
+        case "both":
+            return topcon_ts + (inertial_ts[inertial_jump_idxes] - topcon_ts[topcon_jump_idxes]).mean()
+        case "former":
+            return topcon_ts + (inertial_ts[inertial_jump_idxes[0]] - topcon_ts[topcon_jump_idxes[0]])
+        case "latter":
+            return topcon_ts + (inertial_ts[inertial_jump_idxes[1]] - topcon_ts[topcon_jump_idxes[1]])
 
 def cut_with_padding(ar: np.ndarray, cut_idxes: np.ndarray, padding: int) -> np.ndarray:
     return ar[cut_idxes[0] + padding:cut_idxes[1] - padding + 1]
