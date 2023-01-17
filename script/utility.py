@@ -8,6 +8,7 @@ import numpy as np
 import yaml
 from matplotlib import pyplot as plt
 from scipy.interpolate import interp1d
+from scipy.spatial.transform import Rotation as Rot
 
 
 def _datetime2unix(ts: np.ndarray) -> np.ndarray:
@@ -32,13 +33,17 @@ def adjust_freq(inertial_ts: np.ndarray, topcon_ts: np.ndarray, topcon_pos: np.n
     return np.hstack((resampled_pos_x[:, np.newaxis], resampled_pos_y[:, np.newaxis])), resampled_height
 
 def adjust_ts_offset(inertial_jump_idxes: np.ndarray, inertial_ts: np.ndarray, topcon_jump_idxes: np.ndarray, topcon_ts: np.ndarray, use_jump_idxes: Literal["both", "former", "latter"] = "both") -> np.ndarray:
+    offset: timedelta
     match use_jump_idxes:
         case "both":
-            return topcon_ts + (inertial_ts[inertial_jump_idxes] - topcon_ts[topcon_jump_idxes]).mean()
+            offset = (inertial_ts[inertial_jump_idxes] - topcon_ts[topcon_jump_idxes]).mean()
         case "former":
-            return topcon_ts + (inertial_ts[inertial_jump_idxes[0]] - topcon_ts[topcon_jump_idxes[0]])
+            offset = inertial_ts[inertial_jump_idxes[0]] - topcon_ts[topcon_jump_idxes[0]]
         case "latter":
-            return topcon_ts + (inertial_ts[inertial_jump_idxes[1]] - topcon_ts[topcon_jump_idxes[1]])
+            offset = inertial_ts[inertial_jump_idxes[1]] - topcon_ts[topcon_jump_idxes[1]]
+    print(f"offset is {offset.total_seconds()} [s]")
+
+    return topcon_ts + offset
 
 def cut_with_padding(ar: np.ndarray, cut_idxes: np.ndarray, padding: int) -> np.ndarray:
     return ar[cut_idxes[0] + padding:cut_idxes[1] - padding + 1]
@@ -76,7 +81,7 @@ def find_jump_in_inertial(ts: np.ndarray, acc: np.ndarray, min_interval: int) ->
     plt.plot(ts, acc_norm)
     plt.scatter(ts[jump_idxes], acc_norm[jump_idxes], c="tab:orange")
     plt.xlabel("time")
-    plt.ylabel("acceleration norm")
+    plt.ylabel("acceleration norm [G]")
     plt.show()
 
     return jump_idxes
@@ -105,14 +110,14 @@ def find_jump_in_topcon(ts: np.ndarray, pos: np.ndarray, height: np.ndarray, min
         axes[i].set_xlim(left=begin, right=end)
     axes[0].plot(ts, pos[:, 0])
     axes[0].vlines(ts[jump_idxes], pos[:, 0].min(), pos[:, 0].max(), colors="tab:orange")
-    axes[0].set_ylabel("position x")
+    axes[0].set_ylabel("position x [m]")
     axes[1].plot(ts, pos[:, 1])
     axes[1].vlines(ts[jump_idxes], pos[:, 1].min(), pos[:, 1].max(), colors="tab:orange")
-    axes[1].set_ylabel("position y")
+    axes[1].set_ylabel("position y [m]")
     axes[2].plot(ts, height)
     axes[2].scatter(ts[jump_idxes], height[jump_idxes], c="tab:orange")
     axes[2].set_xlabel("time")
-    axes[2].set_ylabel("height")
+    axes[2].set_ylabel("height [m]")
     fig.show()
 
     return jump_idxes
@@ -163,30 +168,33 @@ def make_ts_unique(ts: np.ndarray, pos: np.ndarray, height: np.ndarray) -> tuple
 
     return np.array(unique_ts, dtype=datetime), np.array(unique_pos, dtype=np.float32), np.array(unique_height, dtype=np.float32)
 
-def plot(ts: np.ndarray, acc: np.ndarray, pos: np.ndarray) -> None:
+def _quat2direct(quat: np.ndarray) -> np.ndarray:
+    return Rot.from_quat(quat).as_euler("ZXZ", degrees=True)[:, 0]
+
+def plot(ts: np.ndarray, quat: np.ndarray, pos: np.ndarray) -> None:
     fig, axes = plt.subplots(nrows=3, sharex=True, figsize=(16, 12))
-    axes[0].plot(ts, np.linalg.norm(acc, axis=1))
-    axes[0].set_ylabel("acceleration norm")
+    axes[0].plot(ts, _quat2direct(quat))
+    axes[0].set_ylabel("inertial sensor direction [°]")
     axes[1].plot(ts, pos[:, 0])
-    axes[1].set_ylabel("position x")
+    axes[1].set_ylabel("position x [m]")
     axes[2].plot(ts, pos[:, 1])
     axes[2].set_xlabel("time")
-    axes[2].set_ylabel("position y")
+    axes[2].set_ylabel("position y [m]")
     fig.show()
 
 def rot(angle: float, pos: np.ndarray) -> np.ndarray:
     angle = math.radians(angle)
     return np.dot(((math.cos(angle), -math.sin(angle)), (math.sin(angle), math.cos(angle))), pos.T).T
 
-def vis_traj(pos: np.ndarray, ref_direct_tan: Optional[float] = None) -> None:
+def vis_tj(pos: np.ndarray, ref_direct_tan: Optional[float] = None) -> None:
     plt.axis("equal")
     if ref_direct_tan is not None:
         ref_direct_y_range = np.array((pos[:, 1].min() - 1, pos[:, 1].max() + 1), dtype=np.float32)
         plt.plot(ref_direct_y_range / ref_direct_tan, ref_direct_y_range, c="tab:orange")
     plt.scatter(pos[1:, 0], pos[1:, 1], s=1, marker=".")
     plt.scatter(pos[0, 0], pos[0, 1])
-    plt.xlabel("position x")
-    plt.ylabel("position y")
+    plt.xlabel("position x [m]")
+    plt.ylabel("position y [m]")
     plt.show()
 
 def write_conf(file_name: str, padding: int, rot_angle: int) -> None:
