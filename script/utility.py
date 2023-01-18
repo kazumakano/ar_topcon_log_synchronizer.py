@@ -54,17 +54,20 @@ def export(data: tuple[tuple[np.ndarray, ...], ...], dir_name: str) -> None:
     if not path.exists(dir):
         mkdir(dir)
 
+    unix_ts_list = []
+    for d in data:
+        unix_ts_list.append(_datetime2unix(d[0]))
+
     for i, d in enumerate(data):
         with open(path.join(dir, str(i + 1) + ".csv"), mode="w", newline="") as f:
             writer = csv.writer(f)
-            t: datetime
-            for j, t in enumerate(d[0]):
-                writer.writerow((t.strftime("%Y-%m-%d %H:%M:%S.%f"), *d[1][j], *d[2][j], d[3][j]))
+            for j in range(len(d[0])):
+                writer.writerow((unix_ts_list[i][j], *d[1][j], *d[2][j], d[3][j]))
     print("written to 1.csv ~ 5.csv")
 
     for i, d in enumerate(data):
         with open(path.join(dir, str(i + 1) + ".pkl"), mode="wb") as f:
-            pickle.dump(d, f)
+            pickle.dump((unix_ts_list[i], *d[1:]), f)
     print("written to 1.pkl ~ 5.pkl")
 
 def _is_separated(min_interval: int, src_idxes: np.ndarray, tgt_idx: int) -> bool:
