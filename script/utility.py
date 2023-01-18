@@ -147,6 +147,20 @@ def load_inertial_log(file: str) -> tuple[np.ndarray, np.ndarray]:
 
     return ts, val
 
+def load_synced_log(file: str) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    match path.splitext(file)[1]:
+        case ".csv":
+            data = np.loadtxt(file, dtype=np.float64, delimiter=",")
+            ts, inertial_val, pos, height = data[:, 0], data[:, 1:17], data[:, 17:19], data[:, 19]
+
+        case ".pkl":
+            with open(file, mode="rb") as f:
+                ts, inertial_val, pos, height = pickle.load(f)
+
+    print(f"{path.basename(file)} has been loaded")
+
+    return ts, inertial_val, pos, height
+
 def load_topcon_log(file: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     ts, pos, height = [], [], []
 
