@@ -46,6 +46,13 @@ def adjust_ts_offset(inertial_jump_idxes: np.ndarray, inertial_ts: np.ndarray, t
 
     return topcon_ts + offset
 
+def calc_dist(pos: np.ndarray) -> float:
+    dist = 0
+    for i in range(len(pos) - 1):
+        dist += np.linalg.norm(pos[i + 1] - pos[i])
+
+    return dist
+
 def cut_with_padding(ar: np.ndarray, cut_idxes: np.ndarray, padding: int) -> np.ndarray:
     return ar[cut_idxes[0] + padding:cut_idxes[1] - padding + 1]
 
@@ -222,8 +229,17 @@ def plot(data: tuple[tuple[np.ndarray, ...], ...]) -> None:
     axes[2].set_ylabel("position y [m]")
     fig.show()
 
+def _unix2datetime(ts: np.ndarray) -> np.ndarray:
+    ts = ts.astype(object)
+
+    for i, t in enumerate(ts):
+        ts[i] = datetime.fromtimestamp(t)
+
+    return ts.astype(datetime)
+
 def plot_with_turn_time(ts: np.ndarray, pos: np.ndarray, quat: np.ndarray) -> None:
     direct = _quat2direct(quat)
+    ts = _unix2datetime(ts)
     turn_idxes = np.empty(4, dtype=int)
     turn_idxes[0] = _find_separated_max_n_idxes(pos[:, 0], 0, 1)[0]
     turn_idxes[1] = _find_separated_max_n_idxes(-pos[:, 0], 0, 1)[0]
@@ -285,6 +301,16 @@ def vis_tj(pos: np.ndarray, ref_direct_tan: Optional[float] = None) -> None:
         plt.plot(ref_direct_y_range / ref_direct_tan, ref_direct_y_range, c="tab:orange")
     plt.scatter(pos[1:, 0], pos[1:, 1], s=1, marker=".")
     plt.scatter(pos[0, 0], pos[0, 1])
+    plt.xlabel("position x [m]")
+    plt.ylabel("position y [m]")
+    plt.show()
+
+def vis_tj_with_phone_direct(pos: np.ndarray, quat: np.ndarray, step: int = 200) -> None:
+    direct = np.deg2rad(_quat2direct(quat))[::step]
+
+    plt.axis("equal")
+    plt.scatter(pos[:, 0], pos[:, 1], s=1, c=np.arange(len(pos)), marker=".")
+    plt.quiver(pos[::step, 0], pos[::step, 1], np.cos(direct), np.sin(direct), np.arange(len(pos), step=step), scale=32, width=0.004)
     plt.xlabel("position x [m]")
     plt.ylabel("position y [m]")
     plt.show()
