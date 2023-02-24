@@ -70,6 +70,14 @@ def export(data: tuple[tuple[np.ndarray, ...], ...], dir_name: str) -> None:
             pickle.dump((unix_ts_list[i], *d[1:]), f)
     print("written to 1.pkl ~ 5.pkl")
 
+def export_fixed(ts: np.ndarray, inertial_val: np.ndarray, pos: np.ndarray, height: np.ndarray, original_file: str) -> None:
+    with open(path.splitext(original_file)[0] + "_fixed.csv", mode="w") as f:
+        writer = csv.writer(f)
+        for i, t in enumerate(ts):
+            writer.writerow((f"{t:.2f}", *[f"{v:.6f}" for v in inertial_val[i]], *pos[i], height[i]))
+
+    print(f"written to {path.splitext(path.basename(original_file))[0]}_fixed.csv")
+
 def _is_separated(min_interval: int, src_idxes: np.ndarray, tgt_idx: int) -> bool:
     for i in src_idxes:
         if abs(i - tgt_idx) < min_interval:
@@ -200,7 +208,7 @@ def make_ts_unique(ts: np.ndarray, pos: np.ndarray, height: np.ndarray) -> tuple
     return np.array(unique_ts, dtype=datetime), np.array(unique_pos, dtype=np.float32), np.array(unique_height, dtype=np.float32)
 
 def _quat2direct(quat: np.ndarray) -> np.ndarray:
-    return Rot.from_quat(quat).as_euler("ZXZ", degrees=True)[:, 0] + 90
+    return (Rot.from_quat(quat).as_euler("ZXZ", degrees=True)[:, 0] + 270) % 360 - 180
 
 def plot(data: tuple[tuple[np.ndarray, ...], ...]) -> None:
     fig, axes = plt.subplots(nrows=3, sharex=True, figsize=(16, 12))
@@ -214,9 +222,44 @@ def plot(data: tuple[tuple[np.ndarray, ...], ...]) -> None:
     axes[2].set_ylabel("position y [m]")
     fig.show()
 
+def plot_with_turn_time(ts: np.ndarray, inertial_val: np.ndarray, pos: np.ndarray) -> None:
+    direct = _quat2direct(inertial_val[:, 12:16])
+    turn_idxes = np.empty(4, dtype=int)
+    turn_idxes[0] = _find_separated_max_n_idxes(pos[:, 0], 0, 1)[0]
+    turn_idxes[1] = _find_separated_max_n_idxes(-pos[:, 0], 0, 1)[0]
+    turn_idxes[2] = _find_separated_max_n_idxes(pos[:, 1], 0, 1)[0]
+    turn_idxes[3] = _find_separated_max_n_idxes(-pos[:, 1], 0, 1)[0]
+
+    fig, axes = plt.subplots(nrows=3, sharex=True, figsize=(16, 12))
+    axes[0].plot(ts, direct)
+    axes[0].set_ylabel("smartphone back direction [°]")
+    axes[0].vlines(ts[turn_idxes], direct.min(), direct.max(), colors="tab:green")
+    axes[1].plot(ts, pos[:, 0])
+    axes[1].set_ylabel("position x [m]")
+    axes[1].vlines(ts[turn_idxes[:2]], pos[:, 0].min(), pos[:, 0].max(), colors="tab:green")
+    axes[2].plot(ts, pos[:, 1])
+    axes[2].set_xlabel("time")
+    axes[2].set_ylabel("position y [m]")
+    axes[2].vlines(ts[turn_idxes[2:]], pos[:, 1].min(), pos[:, 1].max(), colors="tab:green")
+    fig.show()
+
 def rot(angle: float, pos: np.ndarray) -> np.ndarray:
     angle = math.radians(angle)
     return np.dot(((math.cos(angle), -math.sin(angle)), (math.sin(angle), math.cos(angle))), pos.T).T
+
+def shift_pos_and_height(ts: np.ndarray, inertial_val: np.ndarray, pos: np.ndarray, height: np.ndarray, shift_len: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    if shift_len > 0:
+        ts = ts[shift_len:]
+        inertial_val = inertial_val[shift_len:]
+        pos = pos[:-shift_len]
+        height = height[:-shift_len]
+    elif shift_len < 0:
+        ts = ts[:shift_len]
+        inertial_val = inertial_val[:shift_len]
+        pos = pos[-shift_len:]
+        height = height[-shift_len:]
+
+    return ts, inertial_val, pos, height
 
 def split(ts: np.ndarray, inertial_val: np.ndarray, pos: np.ndarray, height: np.ndarray, factor: Literal["x_max", "x_min", "y_max", "y_min"], min_interval: int = 0, split_num: int = 5) -> tuple[tuple[np.ndarray, ...], ...]:
     match factor:
