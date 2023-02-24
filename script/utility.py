@@ -222,8 +222,8 @@ def plot(data: tuple[tuple[np.ndarray, ...], ...]) -> None:
     axes[2].set_ylabel("position y [m]")
     fig.show()
 
-def plot_with_turn_time(ts: np.ndarray, inertial_val: np.ndarray, pos: np.ndarray) -> None:
-    direct = _quat2direct(inertial_val[:, 12:16])
+def plot_with_turn_time(ts: np.ndarray, pos: np.ndarray, quat: np.ndarray) -> None:
+    direct = _quat2direct(quat)
     turn_idxes = np.empty(4, dtype=int)
     turn_idxes[0] = _find_separated_max_n_idxes(pos[:, 0], 0, 1)[0]
     turn_idxes[1] = _find_separated_max_n_idxes(-pos[:, 0], 0, 1)[0]
