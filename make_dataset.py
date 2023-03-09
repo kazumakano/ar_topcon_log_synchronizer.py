@@ -11,7 +11,7 @@ def make_dataset(tgt_dir: str, src_dir: Optional[str] = None) -> None:
     if not path.exists(tgt_dir):
         mkdir(tgt_dir)
 
-    for file in iglob(path.join(src_dir, "*", "*.csv")):
+    for file in iglob(path.join(src_dir, "*/*.csv")):
         shutil.copyfile(file, path.join(tgt_dir, path.basename(path.dirname(file)) + "_" + path.basename(file)))
 
 if __name__ == "__main__":
