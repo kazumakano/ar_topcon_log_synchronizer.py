@@ -7,13 +7,20 @@ from scipy.spatial.transform import Rotation
 from . import utility as util
 
 
+def _ipsj_rcparams(func):
+    def decorated_func(*args, **kwargs):
+        plt.rcParams["axes.edgecolor"] = "gray"
+        plt.rcParams["axes.linewidth"] = 0.8
+
+        return func(*args, **kwargs)
+
+    return decorated_func
+
 def _scs2gcs(acc: np.ndarray, quat: np.ndarray) -> np.ndarray:
     return Rotation(quat).apply(acc)
 
-def create_acc_distrib_figure(inertial_val_dict: dict[str, np.ndarray], pos_dict: dict[str, np.ndarray], result_file_name: Optional[str] = None) -> None:
-    plt.rcParams["axes.edgecolor"] = "gray"
-    plt.rcParams["axes.linewidth"] = 0.8
-
+@_ipsj_rcparams
+def create_acc_distrib_figure(inertial_val_dict: dict[str, np.ndarray], pos_dict: dict[str, np.ndarray], enable_grid: bool = False, result_file_name: Optional[str] = None) -> None:
     fig, axes = plt.subplots(ncols=3, sharex=True, figsize=(12, 4), dpi=1200)
     fig.subplots_adjust(left=0.05, bottom=0.2, right=0.95, wspace=0.1)
 
@@ -29,8 +36,9 @@ def create_acc_distrib_figure(inertial_val_dict: dict[str, np.ndarray], pos_dict
             direct += 180
         hori_acc = util.rot(45 - direct, _scs2gcs(inertial_val_dict[k][:, :3], inertial_val_dict[k][:, 12:])[:, :2])
 
-        axes[i].grid(color="gray", linewidth=0.2)
-        axes[i].scatter(hori_acc[:, 0], hori_acc[:, 1], s=2, marker=".", )
+        if enable_grid:
+            axes[i].grid(color="gray", linewidth=0.1)
+        axes[i].scatter(hori_acc[:, 0], hori_acc[:, 1], s=2, marker=".")
         axes[i].arrow(0, 0, 0.25, 0.25, head_width=0.015, color="tab:orange")
         axes[i].set_title(f"({('a', 'b', 'c')[i]}) {k.capitalize()}", y=-0.25)
         axes[i].set_xlabel("X component of acceleration [G]")
