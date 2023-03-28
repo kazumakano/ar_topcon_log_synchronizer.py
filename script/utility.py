@@ -306,7 +306,7 @@ def vis_tj(pos: np.ndarray, ref_direct_tan: Optional[float] = None) -> None:
     plt.show()
 
 def vis_tj_with_phone_direct(pos: np.ndarray, quat: np.ndarray, step: int = 200) -> None:
-    direct = np.deg2rad(_quat2direct(quat))[::step]
+    direct = np.deg2rad(_quat2direct(quat[::step]))
 
     plt.axis("equal")
     plt.scatter(pos[:, 0], pos[:, 1], s=1, c=np.arange(len(pos)), marker=".")

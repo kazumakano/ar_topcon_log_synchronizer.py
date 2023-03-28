@@ -56,3 +56,23 @@ def create_acc_distrib_figure(inertial_val_dict: dict[str, np.ndarray], pos_dict
         fig.savefig(path.join(path.dirname(__file__), "../result/", result_file_name + ".eps"))
         fig.savefig(path.join(path.dirname(__file__), "../result/", result_file_name + ".png"))
     fig.show()
+
+@_ipsj_rcparams
+def create_course_figure(pos_dict: dict[str, np.ndarray], quat_dict: dict[str, np.ndarray], step: int, result_file_name: Optional[str] = None) -> None:
+    fig, axes = plt.subplots(ncols=3, figsize=(12, 4), dpi=1200)
+    fig.subplots_adjust(left=0.05, bottom=0.2, right=0.95, wspace=0.2)
+
+    for i, k in enumerate(pos_dict.keys()):
+        direct = np.deg2rad(util._quat2direct(quat_dict[k][::step]))
+        axes[i].axis("equal")
+        axes[i].scatter(pos_dict[k][:, 0], pos_dict[k][:, 1], s=1, c=np.arange(len(pos_dict[k])), marker=".")
+        axes[i].quiver(pos_dict[k][::step, 0], pos_dict[k][::step, 1], np.cos(direct), np.sin(direct), np.arange(len(pos_dict[k]), step=step), scale=32, width=0.004)
+        axes[i].set_title(f"({('a', 'b', 'c')[i]}) {k.capitalize()}", y=-0.25)
+        axes[i].set_xlabel("Position [m]")
+        axes[i].tick_params(color="gray", length=2, width=0.8)
+    axes[0].set_ylabel("Position [m]")
+
+    if result_file_name is not None:
+        fig.savefig(path.join("result/", result_file_name + ".eps"))
+        fig.savefig(path.join("result/", result_file_name + ".png"))
+    fig.show()
