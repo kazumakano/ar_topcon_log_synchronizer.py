@@ -105,9 +105,9 @@ def _find_separated_max_n_idxes(ar: np.ndarray, min_interval: int, n: int) -> np
 
     return max_idxes
 
-def find_jump_in_inertial(ts: np.ndarray, acc: np.ndarray, min_interval: int = 0) -> np.ndarray:
+def find_jump_in_inertial(ts: np.ndarray, acc: np.ndarray, min_interval: int = 0, mode: Literal["max", "min"] = "max") -> np.ndarray:
     acc_norm = np.linalg.norm(acc, axis=1)
-    jump_idxes = _find_separated_max_n_idxes(acc_norm, min_interval, 2)
+    jump_idxes = _find_separated_max_n_idxes(acc_norm if mode == "max" else -acc_norm, min_interval, 2)
 
     plt.figure(figsize=(16, 4))
     plt.plot(ts, acc_norm)

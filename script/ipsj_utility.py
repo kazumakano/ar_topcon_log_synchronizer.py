@@ -73,6 +73,41 @@ def create_course_figure(pos_dict: dict[str, np.ndarray], quat_dict: dict[str, n
     axes[0].set_ylabel("Position [m]")
 
     if result_file_name is not None:
-        fig.savefig(path.join("result/", result_file_name + ".eps"))
-        fig.savefig(path.join("result/", result_file_name + ".png"))
+        fig.savefig(path.join(path.dirname(__file__), "../result/", result_file_name + ".eps"))
+        fig.savefig(path.join(path.dirname(__file__), "../result/", result_file_name + ".png"))
+    fig.show()
+
+@_ipsj_rcparams
+def create_sync_figure(acc: np.ndarray, height: np.ndarray, inertial_jump_idxes: np.ndarray, topcon_jump_idxes: np.ndarray, result_file_name: Optional[str] = None) -> None:
+    acc_norm = np.linalg.norm(acc, axis=1)
+
+    plt.rcParams["axes.spines.right"] = False
+    plt.rcParams["axes.spines.top"] = False
+
+    fig, axes = plt.subplots(nrows=2, figsize=(6, 4), dpi=1200)
+    fig.align_ylabels()
+    fig.subplots_adjust(hspace=0.3)
+
+    acc_margin = 0.15 * (inertial_jump_idxes[1] - inertial_jump_idxes[0])
+    acc_lim = (inertial_jump_idxes[0] - acc_margin, inertial_jump_idxes[1] + acc_margin)
+    axes[0].set_xlim(acc_lim)
+    height_margin = 0.15 * (topcon_jump_idxes[1] - topcon_jump_idxes[0])
+    height_lim = (topcon_jump_idxes[0] - height_margin, topcon_jump_idxes[1] + height_margin)
+    axes[1].set_xlim(height_lim)
+
+    acc_lim = (max(math.floor(acc_lim[0]), 0), min(math.ceil(acc_lim[1]), len(acc_norm)))
+    axes[0].plot(range(*acc_lim), acc_norm[acc_lim[0]:acc_lim[1]], linewidth=0.8)
+    axes[0].scatter(inertial_jump_idxes, acc_norm[inertial_jump_idxes], s=8, c="tab:orange")
+    axes[0].set_ylabel("Acceleration norm [G]")
+    axes[0].tick_params(color="gray", length=2, width=0.8)
+    height_lim = (max(math.floor(height_lim[0]), 0), min(math.ceil(height_lim[1]), len(height)))
+    axes[1].plot(range(*height_lim), height[height_lim[0]:height_lim[1]], linewidth=0.8)
+    axes[1].scatter(topcon_jump_idxes, height[topcon_jump_idxes], s=8, c="tab:orange")
+    axes[1].set_xlabel("Sample index")
+    axes[1].set_ylabel("Height [m]")
+    axes[1].tick_params(color="gray", length=2, width=0.8)
+
+    if result_file_name is not None:
+        fig.savefig(path.join(path.dirname(__file__), "../result/", result_file_name + ".eps"))
+        fig.savefig(path.join(path.dirname(__file__), "../result/", result_file_name + ".png"))
     fig.show()
