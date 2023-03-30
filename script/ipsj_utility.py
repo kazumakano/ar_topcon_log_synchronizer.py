@@ -92,7 +92,7 @@ def create_course_figure(pos_dict: dict[str, np.ndarray], quat_dict: dict[str, n
     fig.show()
 
 @_ipsj_rcparams
-def create_sync_figure(acc: np.ndarray, height: np.ndarray, inertial_jump_idxes: np.ndarray, topcon_jump_idxes: np.ndarray, result_file_name: Optional[str] = None) -> None:
+def create_sync_figure(acc: np.ndarray, height: np.ndarray, inertial_jump_idxes: np.ndarray, topcon_jump_idxes: np.ndarray, acc_ticks: Optional[tuple[Iterable, Iterable]] = None, height_ticks: Optional[tuple[Iterable, Iterable]] = None, result_file_name: Optional[str] = None) -> None:
     acc_norm = np.linalg.norm(acc, axis=1)
 
     plt.rcParams["axes.spines.right"] = False
@@ -111,17 +111,23 @@ def create_sync_figure(acc: np.ndarray, height: np.ndarray, inertial_jump_idxes:
     acc_lim = (max(math.floor(acc_lim[0]), 0), min(math.ceil(acc_lim[1]), len(acc_norm)))
     axes[0].plot(range(*acc_lim), acc_norm[acc_lim[0]:acc_lim[1]], linewidth=0.8)
     axes[0].scatter(inertial_jump_idxes, acc_norm[inertial_jump_idxes], s=16, c="tab:orange")
-    axes[0].set_xticklabels(axes[0].get_xticklabels(), fontsize=8)
     axes[0].set_ylabel("Acceleration norm [G]")
-    axes[0].set_yticklabels(axes[0].get_yticklabels(), fontsize=8)
+    if acc_ticks is not None:
+        axes[0].set_xticks(ticks=acc_ticks[0], labels=acc_ticks[0], fontsize=8)
+        axes[0].set_xticks(ticks=_interp_ticks(acc_ticks[0]))
+        axes[0].set_yticks(ticks=acc_ticks[1], labels=acc_ticks[1], fontsize=8)
+        # axes[0].set_yticks(ticks=_interp_ticks(acc_ticks[1]))
     axes[0].tick_params(color="gray", length=2, width=0.8)
     height_lim = (max(math.floor(height_lim[0]), 0), min(math.ceil(height_lim[1]), len(height)))
     axes[1].plot(range(*height_lim), height[height_lim[0]:height_lim[1]], linewidth=0.8)
     axes[1].scatter(topcon_jump_idxes, height[topcon_jump_idxes], s=16, c="tab:orange")
     axes[1].set_xlabel("Sample index")
-    axes[1].set_xticklabels(axes[1].get_xticklabels(), fontsize=8)
     axes[1].set_ylabel("Height [m]")
-    axes[1].set_yticklabels(axes[1].get_yticklabels(), fontsize=8)
+    if height_ticks is not None:
+        axes[1].set_xticks(ticks=height_ticks[0], labels=height_ticks[0], fontsize=8)
+        # axes[1].set_xticks(ticks=_interp_ticks(height_ticks[0]))
+        axes[1].set_yticks(ticks=height_ticks[1], labels=height_ticks[1], fontsize=8)
+        # axes[1].set_yticks(ticks=_interp_ticks(height_ticks[1]))
     axes[1].tick_params(color="gray", length=2, width=0.8)
 
     if result_file_name is not None:
