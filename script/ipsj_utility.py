@@ -1,6 +1,6 @@
 import math
 import os.path as path
-from typing import Optional
+from typing import Iterable, Optional
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.spatial.transform import Rotation
@@ -57,8 +57,17 @@ def create_acc_distrib_figure(inertial_val_dict: dict[str, np.ndarray], pos_dict
         fig.savefig(path.join(path.dirname(__file__), "../result/", result_file_name + ".png"))
     fig.show()
 
+def _interp_ticks(major_ticks: Iterable) -> np.ndarray:
+    minor_ticks = np.empty(2 * len(major_ticks) - 1, dtype=np.float32)
+
+    minor_ticks[::2] = major_ticks
+    for i in range(1, len(minor_ticks), 2):
+        minor_ticks[i] = (minor_ticks[i - 1] + minor_ticks[i + 1]) / 2
+
+    return minor_ticks
+
 @_ipsj_rcparams
-def create_course_figure(pos_dict: dict[str, np.ndarray], quat_dict: dict[str, np.ndarray], result_file_name: Optional[str] = None) -> None:
+def create_course_figure(pos_dict: dict[str, np.ndarray], quat_dict: dict[str, np.ndarray], ticks_dict: Optional[dict[str, tuple[Iterable, Iterable]]] = None, result_file_name: Optional[str] = None) -> None:
     fig, axes = plt.subplots(ncols=3, figsize=(12, 4), dpi=1200)
     fig.subplots_adjust(left=0.05, bottom=0.2, right=0.95, wspace=0.15)
 
@@ -69,8 +78,11 @@ def create_course_figure(pos_dict: dict[str, np.ndarray], quat_dict: dict[str, n
         axes[i].quiver(pos_dict[k][::400, 0], pos_dict[k][::400, 1], np.cos(direct), np.sin(direct), np.arange(len(pos_dict[k]), step=400), scale=32, width=0.004)
         axes[i].set_title(f"({('a', 'b', 'c')[i]}) {k.capitalize()}", y=-0.3)
         axes[i].set_xlabel("Position [m]")
-        axes[i].set_xticklabels(axes[i].get_xticklabels(), fontsize=8)
-        axes[i].set_yticklabels(axes[i].get_yticklabels(), fontsize=8)
+        if ticks_dict is not None:
+            axes[i].set_xticks(ticks=ticks_dict[k][0], labels=ticks_dict[k][0], fontsize=8)
+            axes[i].set_xticks(ticks=_interp_ticks(ticks_dict[k][0]))
+            axes[i].set_yticks(ticks=ticks_dict[k][1], labels=ticks_dict[k][1], fontsize=8)
+            axes[i].set_yticks(ticks=_interp_ticks(ticks_dict[k][1]))
         axes[i].tick_params(color="gray", length=2, width=0.8)
     axes[0].set_ylabel("Position [m]")
 
