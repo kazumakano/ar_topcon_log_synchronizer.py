@@ -87,7 +87,7 @@ def create_course_figure(pos_dict: dict[str, np.ndarray], quat_dict: dict[str, n
     axes[0].set_ylabel("Position [m]")
 
     if result_file_name is not None:
-        fig.savefig(path.join(path.dirname(__file__), "../result/", result_file_name + ".eps"))
+        fig.savefig(path.join(path.dirname(__file__), "../result/", result_file_name + ".pdf"))
         fig.savefig(path.join(path.dirname(__file__), "../result/", result_file_name + ".png"))
     fig.show()
 
