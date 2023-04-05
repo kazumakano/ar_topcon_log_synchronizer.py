@@ -2,6 +2,7 @@ import math
 import os.path as path
 from typing import Iterable, Optional
 import numpy as np
+from matplotlib import cm
 from matplotlib import pyplot as plt
 from scipy.spatial.transform import Rotation
 from . import utility as util
@@ -111,14 +112,14 @@ def create_sync_figure(acc: np.ndarray, height: np.ndarray, inertial_jump_idxes:
     fig.show()
 
 @_ipsj_rcparams
-def create_walk_pattern_figure(pos_dict: dict[str, np.ndarray], quat_dict: dict[str, np.ndarray], ticks_dict: Optional[dict[str, tuple[Iterable, Iterable]]] = None, result_file_name: Optional[str] = None) -> None:
+def create_walk_pattern_figure(pos_dict: dict[str, np.ndarray], quat_dict: dict[str, np.ndarray], ticks_dict: Optional[dict[str, tuple[Iterable, Iterable]]] = None, result_file_name: Optional[str] = None, draw_sparse: int = 1) -> None:
     fig, axes = plt.subplots(ncols=3, figsize=(12, 4), dpi=1200)
     fig.subplots_adjust(left=0.05, bottom=0.2, right=0.95, wspace=0.15)
 
     for i, k in enumerate(pos_dict.keys()):
         direct = np.deg2rad(util._quat2direct(quat_dict[k][::400]))
         axes[i].axis("equal")
-        axes[i].scatter(pos_dict[k][:, 0], pos_dict[k][:, 1], s=1, c=np.arange(len(pos_dict[k])), marker=".")
+        axes[i].scatter(pos_dict[k][::draw_sparse, 0], pos_dict[k][::draw_sparse, 1], s=1, c=np.arange(len(pos_dict[k]), step=draw_sparse), marker=".")
         axes[i].quiver(pos_dict[k][::400, 0], pos_dict[k][::400, 1], np.cos(direct), np.sin(direct), np.arange(len(pos_dict[k]), step=400), scale=32, width=0.004)
         axes[i].set_title(f"({('a', 'b', 'c')[i]}) {k.capitalize()}", y=-0.3)
         axes[i].set_xlabel("Position [m]")
