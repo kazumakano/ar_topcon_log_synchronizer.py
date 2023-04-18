@@ -120,7 +120,7 @@ def create_walk_pattern_figure(pos_dict: dict[str, np.ndarray], quat_dict: dict[
         direct = np.deg2rad(util._quat2direct(quat_dict[k][::400]))
         axes[i].axis("equal")
         axes[i].scatter(pos_dict[k][::draw_sparse, 0], pos_dict[k][::draw_sparse, 1], s=1, c=np.arange(len(pos_dict[k]), step=draw_sparse), marker=".")
-        axes[i].quiver(pos_dict[k][::400, 0], pos_dict[k][::400, 1], np.cos(direct), np.sin(direct), np.arange(len(pos_dict[k]), step=400), scale=32, width=0.004)
+        axes[i].quiver(pos_dict[k][::400, 0], pos_dict[k][::400, 1], np.cos(direct), np.sin(direct), np.arange(len(pos_dict[k]), step=400), scale=24, width=0.004)
         axes[i].set_title(f"({('a', 'b', 'c')[i]}) {k.capitalize()}", y=-0.3)
         axes[i].set_xlabel("Position [m]")
         if ticks_dict is not None:
