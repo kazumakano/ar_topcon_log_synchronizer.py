@@ -12,6 +12,8 @@ def _ipsj_rcparams(func):
     def decorated_func(*args, **kwargs):
         plt.rcParams["axes.edgecolor"] = "gray"
         plt.rcParams["axes.linewidth"] = 0.8
+        plt.rcParams["pdf.fonttype"] = 42
+        plt.rcParams["ps.fonttype"] = 42
 
         return func(*args, **kwargs)
 
