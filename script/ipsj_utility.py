@@ -22,6 +22,17 @@ def _ipsj_rcparams(func):
 def _scs2gcs(acc: np.ndarray, quat: np.ndarray) -> np.ndarray:
     return Rotation(quat).apply(acc)
 
+def calc_acc_distrib_corr_coef(inertial_val_dict: dict[str, np.ndarray], pos_dict: dict[str, np.ndarray]) -> dict[str, float]:
+    corr_coef = {}
+    for k, v in inertial_val_dict.items():
+        direct = math.degrees(math.atan(np.polyfit(pos_dict[k][:, 0], pos_dict[k][:, 1], 1)[0]))
+        if pos_dict[k][-1, 0] - pos_dict[k][0, 0] < 0:
+            direct += 180
+        hori_acc = util.rot(45 - direct, _scs2gcs(v[:, :3], v[:, 12:])[:, :2])
+        corr_coef[k] = np.corrcoef(hori_acc[:, 0], hori_acc[:, 1])[0, 1]
+
+    return corr_coef
+
 @_ipsj_rcparams
 def create_acc_distrib_figure(inertial_val_dict: dict[str, np.ndarray], pos_dict: dict[str, np.ndarray], enable_grid: bool = False, result_file_name: Optional[str] = None) -> None:
     fig, axes = plt.subplots(ncols=3, sharex=True, figsize=(12, 4), dpi=1200)

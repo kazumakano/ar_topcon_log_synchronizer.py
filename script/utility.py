@@ -70,12 +70,12 @@ def export(data: tuple[tuple[np.ndarray, ...], ...], dir_name: str) -> None:
             writer = csv.writer(f)
             for j in range(len(d[0])):
                 writer.writerow((unix_ts_list[i][j], *d[1][j], *d[2][j], d[3][j]))
-    print("written to 1.csv ~ 5.csv")
+    print(f"written to 1.csv ~ {i}.csv")
 
     for i, d in enumerate(data):
         with open(path.join(dir, str(i + 1) + ".pkl"), mode="wb") as f:
             pickle.dump((unix_ts_list[i], *d[1:]), f)
-    print("written to 1.pkl ~ 5.pkl")
+    print(f"written to 1.pkl ~ {i}.pkl")
 
 def export_fixed(ts: np.ndarray, inertial_val: np.ndarray, pos: np.ndarray, height: np.ndarray, original_file: str) -> None:
     with open(path.splitext(original_file)[0] + "_fixed.csv", mode="w") as f:
@@ -154,6 +154,19 @@ def find_jump_in_topcon(ts: np.ndarray, pos: np.ndarray, height: np.ndarray, min
 
     return jump_idxes
 
+def load_ar_log(file: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ts, pos, height = [], [], []
+
+    with open(file) as f:
+        for row in csv.reader(f):
+            ts.append(datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S.%f"))
+            pos.append([float(row[1]), float(row[3])])
+            height.append(float(row[2]))
+
+    print(f"{path.basename(file)} has been loaded")
+    
+    return np.array(ts, dtype=datetime), np.array(pos, dtype=np.float32), np.array(height, dtype=np.float32)
+
 def load_inertial_log(file: str) -> tuple[np.ndarray, np.ndarray]:
     with open(file, mode="rb") as f:
         ts, val = pickle.load(f)
@@ -213,6 +226,14 @@ def make_ts_unique(ts: np.ndarray, pos: np.ndarray, height: np.ndarray) -> tuple
         unique_height.append(height[last_idx + j])
 
     return np.array(unique_ts, dtype=datetime), np.array(unique_pos, dtype=np.float32), np.array(unique_height, dtype=np.float32)
+
+def correct_outlier(max_stride: float, pos: np.ndarray) -> np.ndarray:
+    corrected_pos = pos.copy()
+    for i, s in enumerate(np.linalg.norm(np.diff(pos, axis=0), axis=1)):
+        if s > max_stride:
+            corrected_pos[i + 1:] -= corrected_pos[i + 1] - corrected_pos[i]
+
+    return corrected_pos
 
 def _quat2direct(quat: np.ndarray) -> np.ndarray:
     return (Rot.from_quat(quat).as_euler("ZXZ", degrees=True)[:, 0] + 270) % 360 - 180
