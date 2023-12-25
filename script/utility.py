@@ -4,7 +4,7 @@ import os.path as path
 import pickle
 from datetime import datetime, timedelta
 from os import mkdir
-from typing import Literal, Optional
+from typing import Literal, Optional, overload
 import numpy as np
 import yaml
 from matplotlib import pyplot as plt
@@ -21,17 +21,29 @@ def _datetime2unix(ts: np.ndarray) -> np.ndarray:
 
     return ts.astype(np.float64)
 
+@overload
+def adjust_freq(inertial_ts: np.ndarray, ar_ts: np.ndarray, ar_pos: np.ndarray, ar_height: np.ndarray, ar_ori: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ...
+
+@overload
 def adjust_freq(inertial_ts: np.ndarray, topcon_ts: np.ndarray, topcon_pos: np.ndarray, topcon_height: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    if inertial_ts[0] < topcon_ts[0] or inertial_ts[-1] > topcon_ts[-1]:
-        raise Exception(f"range of topcon log must cover range of inertial sensor log but ({topcon_ts[0]}, {topcon_ts[-1]}) and ({inertial_ts[0]}, {inertial_ts[-1]}) were given")
+    ...
 
-    inertial_ts, topcon_ts = _datetime2unix(inertial_ts), _datetime2unix(topcon_ts)
+def adjust_freq(inertial_ts: np.ndarray, ar_or_topcon_ts: np.ndarray, ar_or_topcon_pos: np.ndarray, ar_or_topcon_height: np.ndarray, ar_ori: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray] | tuple[np.ndarray, np.ndarray]:
+    if inertial_ts[0] < ar_or_topcon_ts[0] or inertial_ts[-1] > ar_or_topcon_ts[-1]:
+        raise Exception(f"range of topcon log must cover range of inertial sensor log but ({ar_or_topcon_ts[0]}, {ar_or_topcon_ts[-1]}) and ({inertial_ts[0]}, {inertial_ts[-1]}) were given")
 
-    resampled_pos_x = interp1d(topcon_ts, topcon_pos[:, 0])(inertial_ts)
-    resampled_pos_y = interp1d(topcon_ts, topcon_pos[:, 1])(inertial_ts)
-    resampled_height = interp1d(topcon_ts, topcon_height)(inertial_ts)
+    inertial_ts, ar_or_topcon_ts = _datetime2unix(inertial_ts), _datetime2unix(ar_or_topcon_ts)
 
-    return np.hstack((resampled_pos_x[:, np.newaxis], resampled_pos_y[:, np.newaxis])), resampled_height
+    resampled_pos_x = interp1d(ar_or_topcon_ts, ar_or_topcon_pos[:, 0])(inertial_ts)
+    resampled_pos_y = interp1d(ar_or_topcon_ts, ar_or_topcon_pos[:, 1])(inertial_ts)
+    resampled_height = interp1d(ar_or_topcon_ts, ar_or_topcon_height)(inertial_ts)
+
+    if ar_ori is None:
+        return np.stack((resampled_pos_x, resampled_pos_y)), resampled_height
+    else:
+        resampled_ori = interp1d(ar_or_topcon_ts, ar_ori)(inertial_ts)
+        return np.stack((resampled_pos_x, resampled_pos_y)), resampled_height, resampled_ori
 
 def adjust_ts_offset(inertial_jump_idxes: np.ndarray, inertial_ts: np.ndarray, topcon_jump_idxes: np.ndarray, topcon_ts: np.ndarray, use_jump_idxes: Literal["both", "former", "latter"] = "both") -> np.ndarray:
     offset: timedelta
@@ -56,7 +68,36 @@ def calc_dist(pos: np.ndarray) -> float:
 def cut_with_padding(ar: np.ndarray, cut_idxes: np.ndarray, padding: int) -> np.ndarray:
     return ar[cut_idxes[0] + padding:cut_idxes[1] - padding + 1]
 
-def export(data: tuple[tuple[np.ndarray, ...], ...], dir_name: str) -> None:
+def export_fixed(ts: np.ndarray, inertial_val: np.ndarray, pos: np.ndarray, height: np.ndarray, original_file: str) -> None:
+    with open(path.splitext(original_file)[0] + "_fixed.csv", mode="w") as f:
+        writer = csv.writer(f)
+        for i, t in enumerate(ts):
+            writer.writerow((f"{t:.2f}", *[f"{v:.6f}" for v in inertial_val[i]], *pos[i], height[i]))
+
+    print(f"written to {path.splitext(path.basename(original_file))[0]}_fixed.csv")
+
+def export_single(dir_and_file_name: str, ts: np.ndarray, inertial_val: np.ndarray, ar_or_topcon_pos: np.ndarray, ar_or_topcon_height: np.ndarray, ar_ori: Optional[np.ndarray] = None) -> None:
+    dir = path.join(path.dirname(__file__), "../synced/", dir_and_file_name)
+    if not path.exists(dir):
+        mkdir(dir)
+
+    ts = _datetime2unix(ts)
+
+    with open(path.join(dir, dir_and_file_name + ".csv"), mode="w", newline="") as f:
+        writer = csv.writer(f)
+        if ar_ori is None:
+            for i, t in enumerate(ts):
+                writer.writerow(t, *inertial_val[i], *ar_or_topcon_pos[i], ar_or_topcon_height[i])
+        else:
+            for i, t in enumerate(ts):
+                writer.writerow(t, *inertial_val[i], *ar_or_topcon_pos[i], ar_or_topcon_height[i], *ar_ori[i])
+    print(f"written to {dir_and_file_name}.csv")
+
+    with open(path.join(dir, dir_and_file_name + ".pkl"), mode="wb") as f:
+        pickle.dump((ts, inertial_val, ar_or_topcon_pos, ar_or_topcon_height, ar_ori), f)
+    print(f"written to {dir_and_file_name}.pkl")
+
+def export_split(data: tuple[tuple[np.ndarray, ...], ...], dir_name: str) -> None:
     dir = path.join(path.dirname(__file__), "../synced/", dir_name)
     if not path.exists(dir):
         mkdir(dir)
@@ -70,20 +111,12 @@ def export(data: tuple[tuple[np.ndarray, ...], ...], dir_name: str) -> None:
             writer = csv.writer(f)
             for j in range(len(d[0])):
                 writer.writerow((unix_ts_list[i][j], *d[1][j], *d[2][j], d[3][j]))
-    print(f"written to 1.csv ~ {i}.csv")
+    print(f"written to 1.csv ~ {i + 1}.csv")
 
     for i, d in enumerate(data):
         with open(path.join(dir, str(i + 1) + ".pkl"), mode="wb") as f:
             pickle.dump((unix_ts_list[i], *d[1:]), f)
-    print(f"written to 1.pkl ~ {i}.pkl")
-
-def export_fixed(ts: np.ndarray, inertial_val: np.ndarray, pos: np.ndarray, height: np.ndarray, original_file: str) -> None:
-    with open(path.splitext(original_file)[0] + "_fixed.csv", mode="w") as f:
-        writer = csv.writer(f)
-        for i, t in enumerate(ts):
-            writer.writerow((f"{t:.2f}", *[f"{v:.6f}" for v in inertial_val[i]], *pos[i], height[i]))
-
-    print(f"written to {path.splitext(path.basename(original_file))[0]}_fixed.csv")
+    print(f"written to 1.pkl ~ {i + 1}.pkl")
 
 def _is_separated(min_interval: int, src_idxes: np.ndarray, tgt_idx: int) -> bool:
     for i in src_idxes:
@@ -105,11 +138,12 @@ def _find_separated_max_n_idxes(ar: np.ndarray, min_interval: int, n: int) -> np
 
     return max_idxes
 
-def find_jump_in_inertial(ts: np.ndarray, acc: np.ndarray, min_interval: int = 0, mode: Literal["max", "min"] = "max") -> np.ndarray:
+def find_jump_in_inertial(ts: np.ndarray, acc: np.ndarray, min_interval: int = 0, mode: Literal["max", "min"] = "min") -> np.ndarray:
     acc_norm = np.linalg.norm(acc, axis=1)
     jump_idxes = _find_separated_max_n_idxes(acc_norm if mode == "max" else -acc_norm, min_interval, 2)
 
     plt.figure(figsize=(16, 4))
+    plt.xlim(left=ts[0], right=ts[-1])
     plt.plot(ts, acc_norm)
     plt.scatter(ts[jump_idxes], acc_norm[jump_idxes], c="tab:orange")
     plt.xlabel("time")
@@ -154,18 +188,19 @@ def find_jump_in_topcon(ts: np.ndarray, pos: np.ndarray, height: np.ndarray, min
 
     return jump_idxes
 
-def load_ar_log(file: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    ts, pos, height = [], [], []
+def load_ar_log(file: str) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    ts, pos, height, ori = [], [], [], []
 
     with open(file) as f:
         for row in csv.reader(f):
             ts.append(datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S.%f"))
             pos.append([float(row[1]), float(row[3])])
             height.append(float(row[2]))
+            ori.append([float(v) for v in row[4:]])
 
     print(f"{path.basename(file)} has been loaded")
     
-    return np.array(ts, dtype=datetime), np.array(pos, dtype=np.float32), np.array(height, dtype=np.float32)
+    return np.array(ts, dtype=datetime), np.array(pos, dtype=np.float32), np.array(height, dtype=np.float32), np.array(ori, dtype=np.float32)
 
 def load_inertial_log(file: str) -> tuple[np.ndarray, np.ndarray]:
     with open(file, mode="rb") as f:
@@ -318,8 +353,12 @@ def split(ts: np.ndarray, inertial_val: np.ndarray, pos: np.ndarray, height: np.
 def vis_tj(pos: np.ndarray, ref_direct_tan: Optional[float] = None) -> None:
     plt.axis("equal")
     if ref_direct_tan is not None:
-        ref_direct_y_range = np.array((pos[:, 1].min() - 1, pos[:, 1].max() + 1), dtype=np.float32)
-        plt.plot(ref_direct_y_range / ref_direct_tan, ref_direct_y_range, c="tab:orange")
+        if abs(ref_direct_tan) > 1:
+            ref_direct_y_range = np.array((pos[:, 1].min() - 1, pos[:, 1].max() + 1), dtype=np.float32)
+            plt.plot(ref_direct_y_range / ref_direct_tan, ref_direct_y_range, c="tab:orange")
+        else:
+            ref_direct_x_range = np.array((pos[:, 0].min() - 1, pos[:, 0].max() + 1), dtype=np.float32)
+            plt.plot(ref_direct_x_range, ref_direct_tan * ref_direct_x_range, c="tab:orange")
     plt.scatter(pos[1:, 0], pos[1:, 1], s=1, marker=".")
     plt.scatter(pos[0, 0], pos[0, 1])
     plt.xlabel("position x [m]")
