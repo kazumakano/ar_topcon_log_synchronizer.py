@@ -40,10 +40,14 @@ def adjust_freq(inertial_ts: np.ndarray, ar_or_topcon_ts: np.ndarray, ar_or_topc
     resampled_height = interp1d(ar_or_topcon_ts, ar_or_topcon_height)(inertial_ts)
 
     if ar_ori is None:
-        return np.stack((resampled_pos_x, resampled_pos_y)), resampled_height
+        return np.hstack((resampled_pos_x[:, np.newaxis], resampled_pos_y[:, np.newaxis])), resampled_height
     else:
-        resampled_ori = interp1d(ar_or_topcon_ts, ar_ori)(inertial_ts)
-        return np.stack((resampled_pos_x, resampled_pos_y)), resampled_height, resampled_ori
+        resampled_ori_x = interp1d(ar_or_topcon_ts, ar_ori[:, 0])(inertial_ts)
+        resampled_ori_y = interp1d(ar_or_topcon_ts, ar_ori[:, 1])(inertial_ts)
+        resampled_ori_z = interp1d(ar_or_topcon_ts, ar_ori[:, 2])(inertial_ts)
+        resampled_ori_w = interp1d(ar_or_topcon_ts, ar_ori[:, 3])(inertial_ts)
+
+        return np.hstack((resampled_pos_x[:, np.newaxis], resampled_pos_y[:, np.newaxis])), resampled_height, np.hstack((resampled_ori_x[:, np.newaxis], resampled_ori_y[:, np.newaxis], resampled_ori_z[:, np.newaxis], resampled_ori_w[:, np.newaxis]))
 
 def adjust_ts_offset(inertial_jump_idxes: np.ndarray, inertial_ts: np.ndarray, topcon_jump_idxes: np.ndarray, topcon_ts: np.ndarray, use_jump_idxes: Literal["both", "former", "latter"] = "both") -> np.ndarray:
     offset: timedelta
@@ -90,7 +94,7 @@ def export_single(dir_and_file_name: str, ts: np.ndarray, inertial_val: np.ndarr
                 writer.writerow(t, *inertial_val[i], *ar_or_topcon_pos[i], ar_or_topcon_height[i])
         else:
             for i, t in enumerate(ts):
-                writer.writerow(t, *inertial_val[i], *ar_or_topcon_pos[i], ar_or_topcon_height[i], *ar_ori[i])
+                writer.writerow((t, *inertial_val[i], *ar_or_topcon_pos[i], ar_or_topcon_height[i], *ar_ori[i]))
     print(f"written to {dir_and_file_name}.csv")
 
     with open(path.join(dir, dir_and_file_name + ".pkl"), mode="wb") as f:
