@@ -69,6 +69,20 @@ def calc_dist(pos: np.ndarray) -> float:
 
     return dist
 
+def cmp_direct(ar_ts: np.ndarray, ar_ori: np.ndarray, inertial_ts: np.ndarray, inertial_quat: np.ndarray, begin: Optional[datetime] = None, end: Optional[datetime] = None) -> None:
+    if begin is None:
+        begin = max(ar_ts[0], inertial_ts[0])
+    if end is None:
+        end = min(ar_ts[-1], inertial_ts[-1])
+
+    plt.figure(figsize=(16, 4))
+    plt.xlim(left=begin, right=end)
+    plt.plot(ar_ts, ar_ori[:, 1])
+    plt.plot(inertial_ts, inertial_quat[:, 0])
+    plt.xlabel("time")
+    plt.ylabel("direct [°]")
+    plt.show()
+
 def cut_with_padding(ar: np.ndarray, cut_idxes: np.ndarray, padding: int) -> np.ndarray:
     return ar[cut_idxes[0] + padding:cut_idxes[1] - padding + 1]
 
@@ -191,6 +205,15 @@ def find_jump_in_topcon(ts: np.ndarray, pos: np.ndarray, height: np.ndarray, min
     fig.show()
 
     return jump_idxes
+
+def find_screen_off(ar_ts: np.ndarray) -> list[int]:
+    screen_off_idxes = []
+    t: timedelta
+    for i, t in enumerate(np.diff(ar_ts)):
+        if t.total_seconds() > 1:
+            screen_off_idxes.append(i)
+
+    return screen_off_idxes
 
 def load_ar_log(file: str) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     ts, pos, height, ori = [], [], [], []
