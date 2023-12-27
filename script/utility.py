@@ -83,6 +83,14 @@ def cmp_direct(ar_ts: np.ndarray, ar_ori: np.ndarray, inertial_ts: np.ndarray, i
     plt.ylabel("direct [°]")
     plt.show()
 
+def correct_outlier(max_stride: float, pos: np.ndarray) -> np.ndarray:
+    corrected_pos = pos.copy()
+    for i, s in enumerate(np.linalg.norm(np.diff(pos, axis=0), axis=1)):
+        if s > max_stride:
+            corrected_pos[i + 1:] -= corrected_pos[i + 1] - corrected_pos[i]
+
+    return corrected_pos
+
 def cut_with_padding(ar: np.ndarray, cut_idxes: np.ndarray, padding: int) -> np.ndarray:
     return ar[cut_idxes[0] + padding:cut_idxes[1] - padding + 1]
 
@@ -288,14 +296,6 @@ def make_ts_unique(ts: np.ndarray, pos: np.ndarray, height: np.ndarray) -> tuple
         unique_height.append(height[last_idx + j])
 
     return np.array(unique_ts, dtype=datetime), np.array(unique_pos, dtype=np.float32), np.array(unique_height, dtype=np.float32)
-
-def correct_outlier(max_stride: float, pos: np.ndarray) -> np.ndarray:
-    corrected_pos = pos.copy()
-    for i, s in enumerate(np.linalg.norm(np.diff(pos, axis=0), axis=1)):
-        if s > max_stride:
-            corrected_pos[i + 1:] -= corrected_pos[i + 1] - corrected_pos[i]
-
-    return corrected_pos
 
 def _quat2direct(quat: np.ndarray) -> np.ndarray:
     return (Rot.from_quat(quat).as_euler("ZXZ", degrees=True)[:, 0] + 270) % 360 - 180
