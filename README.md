@@ -1,4 +1,4 @@
-# topcon_log_synchronizer.py
+# ar_topcon_log_synchronizer.py
 
 ## Usage
 ### make_dataset.py
